@@ -7,8 +7,10 @@ from tqdm import tqdm
 from transformers import CLIPProcessor, CLIPModel
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 import torch
+import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+catch_file1 = "./proxy.npz"
 # proxy_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 # proxy_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 #
@@ -33,13 +35,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 clip_model, clip_preprocess = clip.load("ViT-B/32", device=device)
 def generate_proxy(video_uri, text_query):
+    if os.path.isfile(catch_file1):
+        cache = np.load(catch_file1)
+        return cache['arr_0']
     cap = cv2.VideoCapture(video_uri)
     text = clip.tokenize(text_query).to(device)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    # frames = []
-    results = []
-    i = 0
-    for _ in tqdm(range(total_frames), desc="Processing Frames1", unit='frames'):
+    results = np.zeros(total_frames, dtype=np.float32)
+    for i in tqdm(range(total_frames), desc="Processing Frames1", unit='frames'):
         ret, frame = cap.read()
         if not ret:
             break
@@ -49,35 +52,44 @@ def generate_proxy(video_uri, text_query):
             with torch.no_grad():
                 logits_per_image, logits_per_text = clip_model(frame, text)
                 result = logits_per_image.cpu().numpy().tolist()
-                results.append(result[0][0])
-                i += 1
+                results[i] = result[0][0]
     cap.release()
+    np.savez(catch_file1, results)
     return results
 
 oracle_model_id = "IDEA-Research/grounding-dino-tiny"
 
 oracle_processor = AutoProcessor.from_pretrained(oracle_model_id)
 oracle_model = AutoModelForZeroShotObjectDetection.from_pretrained(oracle_model_id).to(device)
-def generate_oracle(frames, text_query):
-    inputs = oracle_processor(images=frames, text=text_query, return_tensors="pt").to(device)
-    with torch.no_grad():
-        outputs = oracle_model(**inputs)
-    size = frames[0].size[::-1]
-    results = oracle_processor.post_process_grounded_object_detection(
-        outputs,
-        inputs.input_ids,
-        box_threshold=0.4,
-        text_threshold=0.3,
-        target_sizes=[size for _ in frames]
-    )
-    labels = []
-    text_query = text_query.split('.')
-    for result in results:
-        if result:
-            labels.append(1)
+def generate_oracle(video_uri, idxs, text_query):
+    print("heregenerateoracle",len(idxs),idxs)
+    cap = cv2.VideoCapture(video_uri)
+    results = []
+    for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):
+        # print("here",i)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+        ret, frame = cap.read()
+        if not ret:
+            break
         else:
-            labels.append(0)
-    return labels
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = Image.fromarray(frame)
+            inputs = oracle_processor(images=frame, text=text_query, return_tensors="pt").to(device)
+            with torch.no_grad():
+                outputs = oracle_model(**inputs)
+            result = oracle_processor.post_process_grounded_object_detection(
+                outputs,
+                inputs.input_ids,
+                box_threshold=0.4,
+                text_threshold=0.3,
+                target_sizes=[frame.size[::-1]]
+            )
+            if len(result) > 0:
+                results.append(1)
+            else:
+                results.append(0)
+    cap.release()
+    return np.array(results)
 
 class DataSource:
     def lookup(self, idxs: Sequence) -> np.ndarray:
@@ -107,23 +119,13 @@ class VideoSource(DataSource):
 
     def lookup(self, idxs):
         self.lookups += len(idxs)
-        frames = []
-        cap = cv2.VideoCapture(self.video_uri)
-        for i in idxs:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(frame)
-            frames.append(image)
-        cap.release()
-        return generate_oracle(frames, self.text_query)
+        return generate_oracle(self.video_uri, idxs, self.text_query)
 
     def get_ordered_idxs(self) -> np.ndarray:
         return self.proxy_score_sort
 
     def get_y_prob(self) -> np.ndarray:
+        print("heregetyprob", self.proxy_scores, self.proxy_score_sort)
         return self.proxy_scores[self.proxy_score_sort]
 
     def lookup_yprob(self, ids) -> np.ndarray:

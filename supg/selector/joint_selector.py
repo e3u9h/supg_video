@@ -18,7 +18,7 @@ class JointSelector(RecallSelector):
             print("herejoint",tp,tpfp, tpfp*self.query.min_precision, self.total_sampled)
             filter_num = math.ceil(tpfp*self.query.min_precision-tp)
             results1 = self.data.filter(set_ids[:filter_num])
-            results.append(results1)
+            results.extend(results1)
             tp += len(results1)
             tpfp = tpfp - (filter_num - len(results1))
             self.total_sampled += filter_num

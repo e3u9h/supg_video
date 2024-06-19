@@ -10,7 +10,8 @@ import torch
 import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-catch_file1 = "./proxy.npz"
+catch_file1 = "./proxynew.npz"
+catch_file2 = "./oraclenew.npz"
 # proxy_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 # proxy_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 #
@@ -61,41 +62,13 @@ oracle_model_id = "IDEA-Research/grounding-dino-tiny"
 
 oracle_processor = AutoProcessor.from_pretrained(oracle_model_id)
 oracle_model = AutoModelForZeroShotObjectDetection.from_pretrained(oracle_model_id).to(device)
-def generate_oracle(video_uri, idxs, text_query):
-    print("heregenerateoracle",len(idxs),idxs)
-    cap = cv2.VideoCapture(video_uri)
-    results = []
-    for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):
-        # print("here",i)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
-        ret, frame = cap.read()
-        if not ret:
-            break
-        else:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = Image.fromarray(frame)
-            inputs = oracle_processor(images=frame, text=text_query, return_tensors="pt").to(device)
-            with torch.no_grad():
-                outputs = oracle_model(**inputs)
-            result = oracle_processor.post_process_grounded_object_detection(
-                outputs,
-                inputs.input_ids,
-                box_threshold=0.4,
-                text_threshold=0.3,
-                target_sizes=[frame.size[::-1]]
-            )
-            if len(result) > 0:
-                results.append(1)
-            else:
-                results.append(0)
-    cap.release()
-    return np.array(results)
 
 class DataSource:
     def lookup(self, idxs: Sequence) -> np.ndarray:
         raise NotImplemented()
 
     def filter(self, ids) -> np.ndarray:
+        print("herelookup2",len(ids))
         labels = self.lookup(ids)
         return np.array([ids[i] for i in range(len(ids)) if labels[i]])
 
@@ -116,9 +89,53 @@ class VideoSource(DataSource):
         self.random = np.random.RandomState(seed)
         self.proxy_score_sort = np.lexsort((self.random.random(len(self.proxy_scores)), self.proxy_scores))[::-1]
         self.lookups = 0
+        self.labels = np.full((len(self.proxy_scores),), -1, dtype=np.int32)
 
-    def lookup(self, idxs):
+    def lookup(self, idxs, save=True):
+        def generate_oracle(video_uri, idxs, text_query):
+            print("heregenerateoracle", len(idxs))
+            cap = cv2.VideoCapture(video_uri)
+            results = []
+            for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):
+                # print("here",i)
+                if self.labels[i] != -1:
+                    results.append(self.labels[i])
+                    continue
+                cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                else:
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame = Image.fromarray(frame)
+                    inputs = oracle_processor(images=frame, text=text_query, return_tensors="pt").to(device)
+                    with torch.no_grad():
+                        outputs = oracle_model(**inputs)
+                    result = oracle_processor.post_process_grounded_object_detection(
+                        outputs,
+                        inputs.input_ids,
+                        box_threshold=0.4,
+                        text_threshold=0.3,
+                        target_sizes=torch.tensor([frame.size[::-1]])
+                    )[0]
+                    # print("here11111",result, result['labels'])
+                    if len(result['labels']) > 0:
+                        # print("11111", result, result['labels'])
+                        results.append(1)
+                        self.labels[i] = 1
+                    else:
+                        results.append(0)
+                        self.labels[i] = 0
+            cap.release()
+            return np.array(results)
         self.lookups += len(idxs)
+        if save:
+            if os.path.isfile(catch_file2):
+                cache = np.load(catch_file2)
+                self.labels = cache['arr_0']
+            results = generate_oracle(self.video_uri, idxs, self.text_query)
+            np.savez(catch_file2, self.labels)
+            return results
         return generate_oracle(self.video_uri, idxs, self.text_query)
 
     def get_ordered_idxs(self) -> np.ndarray:

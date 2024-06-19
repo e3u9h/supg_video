@@ -13,28 +13,21 @@ from supg.datasource.datasource import VideoSource
 print('here6')
 import matplotlib.pyplot as plt
 
-trial_runner = TrialRunner()
-print('here7')
-source = VideoSource('../../out.mp4','dog')
-print('here8')
-query = ApproxQuery(
-        qtype='jt',
-        min_recall=0.5, min_precision=0.5, delta=0.05,
-        budget=10000
-)
-print('here9')
+# source = VideoSource('../../out.mp4','dog')
+source = VideoSource('newout.mp4','a dog.')
 sampler = ImportanceSampler()
-print('here10')
 verbose = True
-selector = JointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
-print('here11')
-results_df = trial_runner.run_trials(
-        selector=selector,
-        query=query,
-        sampler=sampler,
-        source=source,
-        nb_trials=100,
-        verbose=verbose
-)
-print('here12')
-print(results_df)
+targets = [0.5, 0.6, 0.7, 0.8, 0.9]
+queries_num = []
+for target in targets:
+        query = ApproxQuery(
+                qtype='jt',
+                min_recall=target, min_precision=target, delta=0.05,
+                budget=2000
+        )
+        selector = JointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
+        return_idxs = selector.select()
+        queries_num.append(selector.total_sampled)
+        print('target:', target, 'num:', selector.total_sampled)
+plt.plot(targets, queries_num)
+

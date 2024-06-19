@@ -24,6 +24,9 @@ class RecallSelector(BaseSelector):
         self.sample_mode = sample_mode
         self.verbose = verbose
 
+        self.set_ids = []
+        self.pos_sampled = []
+
     def log(self, str):
         if self.verbose:
             print(str)
@@ -59,16 +62,21 @@ class RecallSelector(BaseSelector):
         x_basep = np.repeat(1/n_xs, n_xs)
         x_masses = x_basep/x_weights
 
+        # 这个sort保证了回来的rank（index的index）升序排列，这样，对应的lookup回来的东西是按proxy score降序排列的
         s_ranks = np.sort(self.sampler.sample(max_idx=n_xs, s=budget))
         s_probs = x_probs[s_ranks]
         s_weights = x_weights[s_ranks]
         s_basep = x_basep[s_ranks]
+        print("herelookup1",len(data_idxs[s_ranks]))
         s_labels = self.data.lookup(data_idxs[s_ranks])
         s_masses = s_basep/s_weights
 
         # For joint
         self.sampled = np.unique(data_idxs[s_ranks])
-        pos_sampled = self.data.filter(data_idxs[s_ranks])
+        ids = data_idxs[s_ranks]
+        pos_sampled = np.array([ids[i] for i in range(len(ids)) if s_labels[i] == 1])
+        self.pos_sampled = pos_sampled
+        print("herepositivesampled",len(pos_sampled))
 
         tot_pos_mass = np.sum(s_masses * s_labels)
         n_sample = budget
@@ -78,11 +86,14 @@ class RecallSelector(BaseSelector):
         cum_mass = 0
         t_s_idx = n_sample
         for i in range(n_sample):
+            # 由于s_labels是按照proxy score降序排列的，所以这里的累加是按照proxy score从高到低的顺序，就是在从高到低地试那个阈值（伪代码里的第六行），保证了找到的第一个符合recall条件的就是最大的
+            # i是index的index的index
             cum_mass += s_labels[i]*s_masses[i]
             if cum_mass >= target_mass:
                 t_s_idx = i
                 break
         t_u_idx = s_ranks[t_s_idx]
+        # t_s_idx是sample里的第几名，t_u_idx是所有数据里的第几名
         self.log("t_s_idx: {} / {}. t_u_idx: {} / {}".format(
             t_s_idx, n_sample,
             t_u_idx, len(x_probs)
@@ -95,6 +106,7 @@ class RecallSelector(BaseSelector):
         u_ind_r = x_ranks > t_u_idx
 
         delta = self.query.delta
+        # fx算的是z1和z2，然后算了UB和LB
         bounder = SamplingBounds(delta=delta / 2)
         _, s_left_ub = bounder.calc_bounds(
             fx=s_labels * s_masses * s_ind_l,
@@ -104,13 +116,14 @@ class RecallSelector(BaseSelector):
         )
 
         self.log("left_adj: {}, right_adj: {}".format(s_left_ub, s_right_lb))
+        # rc是y'
         rc = s_left_ub / (s_left_ub + s_right_lb)
         self.log("Rc: {}".format(rc))
 
         if rc >= 1.:
             return np.array(list(range(n_xs)))
 
-        t_adj_s_idx = n_sample - 1
+        # t_adj_s_idx是t'对应的数据的index的index的index,s_pos_idxs是所有符合t'要求的数据的index的index的index(但是好像没用到这个)
         cum_mass = 0
         s_pos_idxs = []
         for i in range(n_sample):
@@ -120,9 +133,12 @@ class RecallSelector(BaseSelector):
             if cum_mass >= rc * tot_pos_mass:
                 t_adj_s_idx = i
                 break
+        # t'对应的数据的index的index
         t_adj_u_idx = s_ranks[t_adj_s_idx]
 
+        # 所有符合t'要求的数据的index
         set_ids = data_idxs[:t_adj_u_idx+1]
+        self.set_ids = set_ids
         all_inds = np.unique(
                 np.concatenate([set_ids, pos_sampled])
         )

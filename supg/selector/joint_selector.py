@@ -23,4 +23,5 @@ class JointSelector(RecallSelector):
             tpfp = tpfp - (filter_num - len(results1))
             self.total_sampled += filter_num
             set_ids = set_ids[filter_num:]
+        results.extend(set_ids)
         return np.array(results)

@@ -74,7 +74,8 @@ class RecallSelector(BaseSelector):
         # For joint
         self.sampled = np.unique(data_idxs[s_ranks])
         ids = data_idxs[s_ranks]
-        self.pos_sampled = [ids[i] for i in range(len(ids)) if s_labels[i] == 1]
+        pos_sampled = [ids[i] for i in range(len(ids)) if s_labels[i] == 1]
+        self.pos_sampled = pos_sampled
         pos_sampled = np.array(self.pos_sampled)
         print("herepositivesampled",len(pos_sampled))
 

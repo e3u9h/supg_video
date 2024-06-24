@@ -11,7 +11,7 @@ import os
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 catch_file1 = "./proxynew.npz"
-catch_file2 = "./oraclenew.npz"
+catch_file2 = "./oraclenew2.npz"
 # proxy_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 # proxy_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 #
@@ -111,11 +111,9 @@ class VideoSource(DataSource):
                     inputs = oracle_processor(images=frame, text=text_query, return_tensors="pt").to(device)
                     with torch.no_grad():
                         outputs = oracle_model(**inputs)
-                    result = oracle_processor.post_process_grounded_object_detection(
+                    result = oracle_processor.image_processor.post_process_object_detection(
                         outputs,
-                        inputs.input_ids,
-                        box_threshold=0.4,
-                        text_threshold=0.3,
+                        threshold=0.8,
                         target_sizes=torch.tensor([frame.size[::-1]])
                     )[0]
                     # print("here11111",result, result['labels'])

@@ -9,9 +9,9 @@ import math
 class JointSelector(RecallSelector):
     def select(self) -> Sequence:
         all_inds = super().select()
-        set_ids = self.set_ids
+        set_ids = self.set_ids[~np.isin(self.set_ids, self.sampled)]
         tp = len(self.pos_sampled)
-        tpfp = len(all_inds)
+        tpfp = len(self.pos_sampled) + len(set_ids)
         results = self.pos_sampled
         self.total_sampled = self.query.budget
         while tp < tpfp * self.query.min_precision:

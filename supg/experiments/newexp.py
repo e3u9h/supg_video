@@ -13,9 +13,24 @@ from supg.datasource.datasource import VideoSource
 print('here6')
 import matplotlib.pyplot as plt
 import cv2
+import argparse
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='SUPG')
+    parser.add_argument('--source', type=str, default='newout.mp4', help='source video file')
+    parser.add_argument('--text', type=str, default='a person.', help='query text')
+    parser.add_argument('--multiple_videos', type=bool, default=False, help='multiple videos')
+    parser.add_argument('--budget', type=int, default=1000, help='budget')
+    return parser.parse_args(), parser.print_help()
+
+opt, print_usage = parse_args()
+print("hereargs",opt.source, opt.text, opt.multiple_videos, opt.budget)
+source = VideoSource(opt.source, opt.text, opt.multiple_videos)
 # source = VideoSource('../../out.mp4','dog')
-source = VideoSource('newout.mp4','a dog.')
+# source = VideoSource('newout.mp4','a dog.')
+# source = VideoSource('newout.mp4','an elephant.')
+# source = VideoSource('newout.mp4','a person.')
+# source = VideoSource("D:\\2024srdata\\2017-04-10-1000", "a car.", multiple_videos=True)
 sampler = ImportanceSampler()
 verbose = True
 targets = [0.5, 0.6, 0.7, 0.8, 0.9]
@@ -24,7 +39,7 @@ for target in targets:
         query = ApproxQuery(
                 qtype='jt',
                 min_recall=target, min_precision=target, delta=0.05,
-                budget=1000
+                budget=opt.budget
         )
         selector = JointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
         return_idxs = selector.select()

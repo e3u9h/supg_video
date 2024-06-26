@@ -8,10 +8,13 @@ from transformers import CLIPProcessor, CLIPModel
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 import torch
 import os
+import re
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-catch_file1 = "./proxynew.npz"
-catch_file2 = "./oraclenew2.npz"
+# catch_file1 = "./proxy20170410.npz"
+# catch_file2 = "./oracle20170410.npz"
+# catch_file1 = "./proxyperson.npz"
+# catch_file2 = "./oracleperson.npz"
 # proxy_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 # proxy_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 #
@@ -36,9 +39,6 @@ catch_file2 = "./oraclenew2.npz"
 
 clip_model, clip_preprocess = clip.load("ViT-B/32", device=device)
 def generate_proxy(video_uri, text_query):
-    if os.path.isfile(catch_file1):
-        cache = np.load(catch_file1)
-        return cache['arr_0']
     cap = cv2.VideoCapture(video_uri)
     text = clip.tokenize(text_query).to(device)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -55,7 +55,6 @@ def generate_proxy(video_uri, text_query):
                 result = logits_per_image.cpu().numpy().tolist()
                 results[i] = result[0][0]
     cap.release()
-    np.savez(catch_file1, results)
     return results
 
 oracle_model_id = "IDEA-Research/grounding-dino-tiny"
@@ -82,10 +81,25 @@ class DataSource:
         raise NotImplemented()
 
 class VideoSource(DataSource):
-    def __init__(self, video_uri, text_query, seed=123041):
+    def __init__(self, video_uri, text_query, multiple_videos=False, seed=123041):
         self.video_uri = video_uri
         self.text_query = text_query
-        self.proxy_scores = generate_proxy(video_uri, text_query)
+        self.multiple_videos = multiple_videos
+        print("heresplit", re.split(r'\.|/|\\', video_uri), text_query.split('.'))
+        catch_file1 = "./proxy"+re.split(r'\.|/|\\', video_uri)[-2]+text_query.split('.')[-1]+".npz"
+        print("herecatchfile1", catch_file1)
+        if os.path.isfile(catch_file1):
+            self.proxy_scores = np.load(catch_file1)['arr_0']
+        else:
+            if multiple_videos:
+                self.video_files = [os.path.join(video_uri, f) for f in os.listdir(video_uri) if
+                                    os.path.isfile(os.path.join(video_uri, f))]
+                self.proxy_scores = []
+                for each_uri in self.video_files:
+                    self.proxy_scores.extend(generate_proxy(each_uri, text_query))
+            else:
+                self.proxy_scores = generate_proxy(video_uri, text_query)
+            np.savez(catch_file1, self.proxy_scores)
         self.random = np.random.RandomState(seed)
         self.proxy_score_sort = np.lexsort((self.random.random(len(self.proxy_scores)), self.proxy_scores))[::-1]
         self.lookups = 0
@@ -127,14 +141,28 @@ class VideoSource(DataSource):
             cap.release()
             return np.array(results)
         self.lookups += len(idxs)
+        catch_file2 = "./oracle"+re.split(r'\.|/|\\', video_uri)[-2]+text_query.split('.')[-1]+".npz"
+        print("herecatchfile2", catch_file2)
         if save:
             if os.path.isfile(catch_file2):
                 cache = np.load(catch_file2)
                 self.labels = cache['arr_0']
-            results = generate_oracle(self.video_uri, idxs, self.text_query)
-            np.savez(catch_file2, self.labels)
+            if self.multiple_videos:
+                results = []
+                for video_uri in self.video_files:
+                    results.extend(generate_oracle(video_uri, idxs, self.text_query))
+                    np.savez(catch_file2, self.labels)
+            else:
+                results = generate_oracle(self.video_uri, idxs, self.text_query)
+                np.savez(catch_file2, self.labels)
             return results
-        return generate_oracle(self.video_uri, idxs, self.text_query)
+        if self.multiple_videos:
+            results = []
+            for video_uri in self.video_files:
+                results.extend(generate_oracle(video_uri, idxs, self.text_query))
+            return results
+        else:
+            return generate_oracle(self.video_uri, idxs, self.text_query)
 
     def get_ordered_idxs(self) -> np.ndarray:
         return self.proxy_score_sort

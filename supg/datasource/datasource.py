@@ -141,7 +141,7 @@ class VideoSource(DataSource):
             cap.release()
             return np.array(results)
         self.lookups += len(idxs)
-        catch_file2 = "./oracle"+re.split(r'\.|/|\\', video_uri)[-2]+text_query.split('.')[-1]+".npz"
+        catch_file2 = "./oracle"+re.split(r'\.|/|\\', self.video_uri)[-2]+text_query.split('.')[-1]+".npz"
         print("herecatchfile2", catch_file2)
         if save:
             if os.path.isfile(catch_file2):

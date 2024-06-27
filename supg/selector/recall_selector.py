@@ -140,6 +140,7 @@ class RecallSelector(BaseSelector):
 
         # 所有符合t'要求的数据的index
         set_ids = data_idxs[:t_adj_u_idx+1]
+        self.critical_value = data_idxs[t_adj_u_idx]
         self.set_ids = set_ids
         all_inds = np.unique(
                 np.concatenate([set_ids, pos_sampled])

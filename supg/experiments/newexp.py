@@ -1,5 +1,7 @@
 # import sys
 # sys.path.append('./')
+import numpy as np
+
 print('here1')
 from supg.sampler import ImportanceSampler
 print('here2')
@@ -27,10 +29,10 @@ opt, print_usage = parse_args()
 print("hereargs",opt.source, opt.text, opt.multiple_videos, opt.budget)
 source = VideoSource(opt.source, opt.text, opt.multiple_videos)
 # source = VideoSource('../../out.mp4','dog')
-# source = VideoSource('newout.mp4','a dog.')
-# source = VideoSource('newout.mp4','an elephant.')
-# source = VideoSource('newout.mp4','a person.')
-# source = VideoSource("D:\\2024srdata\\2017-04-10-1000", "a car.", multiple_videos=True)
+# source = VideoSource('newout.mp4','a dog')
+# source = VideoSource('newout.mp4','an elephant')
+# source = VideoSource('newout.mp4','a person')
+# source = VideoSource("D:\\2024srdata\\2017-04-10-1000", "a car", multiple_videos=True)
 sampler = ImportanceSampler()
 verbose = True
 targets = [0.5, 0.6, 0.7, 0.8, 0.9]
@@ -45,6 +47,34 @@ for target in targets:
         return_idxs = selector.select()
         queries_num.append(selector.total_sampled)
         print('target:', target, 'num:', selector.total_sampled)
+
+        indices = np.arange(len(source.proxy_scores))
+        plt.vlines(indices, 0, source.proxy_scores, color='b', linewidth=0.01, label='Not used oracle')
+        print("here",selector.sampled)
+        plt.vlines(indices[selector.sampled], 0, source.proxy_scores[selector.sampled], color='r', linewidth=0.01, label='Used oracle')
+        plt.axhline(y=source.proxy_scores[selector.critical_value], color='g', linestyle='--', linewidth=0.5, label='Critical Value')
+        title = opt.source+", "+opt.text+", "+str(target)
+        plt.title(title)
+        plt.xlabel('Frame')
+        plt.ylabel('Proxy Score')
+        plt.legend(loc="upper right")
+        plt.savefig(title+'.png')
+        plt.show()
+        # source.proxy_score_sort:第一名是哪个数，第二名是哪个数...；rank: 第一个数是第几名，第二个数是第几名...
+        plt.vlines(indices, 0, source.proxy_scores[source.proxy_score_sort], color='b', linewidth=0.01, label='Not used oracle')
+        rank = np.empty(len(source.proxy_score_sort))
+        rank[source.proxy_score_sort] = np.arange(len(source.proxy_score_sort))
+        plt.vlines(rank[selector.sampled], 0, source.proxy_scores[selector.sampled], color='r', linewidth=0.01,
+                   label='Used oracle')
+        plt.axhline(y=source.proxy_scores[selector.critical_value], color='g', linestyle='--', linewidth=0.5, label='Critical Value')
+        title = title + " sorted"
+        plt.title(title)
+        plt.xlabel('Frame')
+        plt.ylabel('Proxy Score')
+        plt.legend(loc="upper right")
+        plt.savefig(title + '.png')
+        plt.show()
+
         # if target != 0.5:
         #         cap = cv2.VideoCapture('newout.mp4')
         #         for i in range(len(source.labels)):

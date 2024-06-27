@@ -103,11 +103,17 @@ class VideoSource(DataSource):
         self.random = np.random.RandomState(seed)
         self.proxy_score_sort = np.lexsort((self.random.random(len(self.proxy_scores)), self.proxy_scores))[::-1]
         self.lookups = 0
-        self.labels = np.full((len(self.proxy_scores),), -1, dtype=np.int32)
+        catch_file2 = "./oracle" + re.split(r'\.|/|\\', self.video_uri)[-2] + self.text_query.split('.')[-1] + ".npz"
+        if os.path.isfile(catch_file2):
+                cache = np.load(catch_file2)
+                self.labels = cache['arr_0']
+        else:
+            self.labels = np.full((len(self.proxy_scores),), -1, dtype=np.int32)
 
     def lookup(self, idxs, save=True):
         def generate_oracle(video_uri, idxs, text_query):
             print("heregenerateoracle", len(idxs))
+            text_query = text_query + "."
             cap = cv2.VideoCapture(video_uri)
             results = []
             for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):

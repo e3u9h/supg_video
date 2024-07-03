@@ -120,7 +120,7 @@ class VideoSource(DataSource):
             for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):
                 # print("here",i)
                 if self.labels[i] != -1:
-                    print("here111")
+                    # print("here111")
                     results.append(self.labels[i])
                     continue
                 cap.set(cv2.CAP_PROP_POS_FRAMES, i)

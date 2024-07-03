@@ -81,14 +81,15 @@ class DataSource:
         raise NotImplemented()
 
 class VideoSource(DataSource):
-    def __init__(self, video_uri, text_query, multiple_videos=False, seed=123041):
+    def __init__(self, video_uri, text_query, multiple_videos=False, save=True, seed=123041):
         self.video_uri = video_uri
         self.text_query = text_query
         self.multiple_videos = multiple_videos
+        self.save = save
         print("heresplit", re.split(r'\.|/|\\', video_uri), text_query.split('.'))
         catch_file1 = "./proxy"+re.split(r'\.|/|\\', video_uri)[-2]+text_query.split('.')[-1]+".npz"
         print("herecatchfile1", catch_file1)
-        if os.path.isfile(catch_file1):
+        if save and os.path.isfile(catch_file1):
             self.proxy_scores = np.load(catch_file1)['arr_0']
         else:
             if multiple_videos:
@@ -104,13 +105,13 @@ class VideoSource(DataSource):
         self.proxy_score_sort = np.lexsort((self.random.random(len(self.proxy_scores)), self.proxy_scores))[::-1]
         self.lookups = 0
         catch_file2 = "./oracle" + re.split(r'\.|/|\\', self.video_uri)[-2] + self.text_query.split('.')[-1] + ".npz"
-        if os.path.isfile(catch_file2):
+        if save and os.path.isfile(catch_file2):
                 cache = np.load(catch_file2)
                 self.labels = cache['arr_0']
         else:
             self.labels = np.full((len(self.proxy_scores),), -1, dtype=np.int32)
 
-    def lookup(self, idxs, save=True):
+    def lookup(self, idxs):
         def generate_oracle(video_uri, idxs, text_query):
             print("heregenerateoracle", len(idxs))
             text_query = text_query + "."
@@ -119,6 +120,7 @@ class VideoSource(DataSource):
             for i in tqdm(idxs, desc="Processing Frames2", unit='frames'):
                 # print("here",i)
                 if self.labels[i] != -1:
+                    print("here111")
                     results.append(self.labels[i])
                     continue
                 cap.set(cv2.CAP_PROP_POS_FRAMES, i)
@@ -149,7 +151,7 @@ class VideoSource(DataSource):
         self.lookups += len(idxs)
         catch_file2 = "./oracle"+re.split(r'\.|/|\\', self.video_uri)[-2]+self.text_query.split('.')[-1]+".npz"
         print("herecatchfile2", catch_file2)
-        if save:
+        if self.save:
             if os.path.isfile(catch_file2):
                 cache = np.load(catch_file2)
                 self.labels = cache['arr_0']

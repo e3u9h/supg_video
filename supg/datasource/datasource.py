@@ -4,13 +4,27 @@ import numpy as np
 import cv2
 from PIL import Image
 from tqdm import tqdm
-from transformers import CLIPProcessor, CLIPModel
+#from transformers import CLIPProcessor, CLIPModel
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 import torch
 import os
 import re
+# new_cache_dir = '/research/d2/spc/fzdu2/cache'
+# if not os.path.exists(new_cache_dir):
+#     os.makedirs(new_cache_dir, exist_ok=True)
+# os.environ['TORCH_HOME'] = os.getenv('TORCH_HOME', '/research/d2/spc/fzdu2/cache')
+# print(f"TORCH_HOME is set to: {os.environ.get('TORCH_HOME')}")
 
+# Manually set clip's cache directory
+# clip._download_root = os.path.join(os.environ['TORCH_HOME'], 'clip')
+
+# Check clip's cache directory
+# print(f"clip cache directory: {clip._download_root}")
+print(torch.__version__)
+print(torch.version.cuda)
+print(torch.cuda.is_available())
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print("device:", device)
 # catch_file1 = "./proxy20170410.npz"
 # catch_file2 = "./oracle20170410.npz"
 # catch_file1 = "./proxyperson.npz"
@@ -81,12 +95,13 @@ class DataSource:
         raise NotImplemented()
 
 class VideoSource(DataSource):
-    def __init__(self, video_uri, text_query, multiple_videos=False, save=True, seed=123041):
+    def __init__(self, video_uri, text_query, multiple_videos=False, save=True, oth=0.8, seed=12304):
         self.video_uri = video_uri
         self.text_query = text_query
         self.multiple_videos = multiple_videos
         self.save = save
-        print("heresplit", re.split(r'\.|/|\\', video_uri), text_query.split('.'))
+        self.oth = oth
+        # print("heresplit", re.split(r'\.|/|\\', video_uri), text_query.split('.'))
         catch_file1 = "./proxy"+re.split(r'\.|/|\\', video_uri)[-2]+text_query.split('.')[-1]+".npz"
         print("herecatchfile1", catch_file1)
         if save and os.path.isfile(catch_file1):
@@ -104,9 +119,9 @@ class VideoSource(DataSource):
         self.random = np.random.RandomState(seed)
         self.proxy_score_sort = np.lexsort((self.random.random(len(self.proxy_scores)), self.proxy_scores))[::-1]
         self.lookups = 0
-        catch_file2 = "./oracle" + re.split(r'\.|/|\\', self.video_uri)[-2] + self.text_query.split('.')[-1] + ".npz"
-        if save and os.path.isfile(catch_file2):
-                cache = np.load(catch_file2)
+        self.catch_file2 = "./oracle" + re.split(r'\.|/|\\', self.video_uri)[-2] + self.text_query.split('.')[-1] + str(int(oth*10))+ ".npz"
+        if save and os.path.isfile(self.catch_file2):
+                cache = np.load(self.catch_file2)
                 self.labels = cache['arr_0']
         else:
             self.labels = np.full((len(self.proxy_scores),), -1, dtype=np.int32)
@@ -135,7 +150,7 @@ class VideoSource(DataSource):
                         outputs = oracle_model(**inputs)
                     result = oracle_processor.image_processor.post_process_object_detection(
                         outputs,
-                        threshold=0.8,
+                        threshold=self.oth,
                         target_sizes=torch.tensor([frame.size[::-1]])
                     )[0]
                     # print("here11111",result, result['labels'])
@@ -149,20 +164,19 @@ class VideoSource(DataSource):
             cap.release()
             return np.array(results)
         self.lookups += len(idxs)
-        catch_file2 = "./oracle"+re.split(r'\.|/|\\', self.video_uri)[-2]+self.text_query.split('.')[-1]+".npz"
-        print("herecatchfile2", catch_file2)
+        # print("herecatchfile2", self.catch_file2)
         if self.save:
-            if os.path.isfile(catch_file2):
-                cache = np.load(catch_file2)
+            if os.path.isfile(self.catch_file2):
+                cache = np.load(self.catch_file2)
                 self.labels = cache['arr_0']
             if self.multiple_videos:
                 results = []
                 for video_uri in self.video_files:
                     results.extend(generate_oracle(video_uri, idxs, self.text_query))
-                    np.savez(catch_file2, self.labels)
+                    np.savez(self.catch_file2, self.labels)
             else:
                 results = generate_oracle(self.video_uri, idxs, self.text_query)
-                np.savez(catch_file2, self.labels)
+                np.savez(self.catch_file2, self.labels)
             return results
         if self.multiple_videos:
             results = []

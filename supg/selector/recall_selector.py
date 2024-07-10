@@ -81,6 +81,7 @@ class RecallSelector(BaseSelector):
         print("herepositivesampled",len(pos_sampled))
 
         tot_pos_mass = np.sum(s_masses * s_labels)
+        print("here",tot_pos_mass)
         n_sample = budget
         n_pos = np.sum(s_labels)
         rt = self.query.min_recall
@@ -137,6 +138,7 @@ class RecallSelector(BaseSelector):
                 break
         # t'对应的数据的index的index
         t_adj_u_idx = s_ranks[t_adj_s_idx]
+        print("hereadj",t_adj_u_idx)
 
         # 所有符合t'要求的数据的index
         set_ids = data_idxs[:t_adj_u_idx+1]

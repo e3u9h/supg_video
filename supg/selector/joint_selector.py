@@ -13,7 +13,8 @@ class JointSelector(RecallSelector):
         tp = len(self.pos_sampled)
         tpfp = len(self.pos_sampled) + len(set_ids)
         results = self.pos_sampled
-        self.total_sampled = self.query.budget
+        # self.total_sampled = self.query.budget
+        self.total_sampled = len(self.sampled)
         while tp < tpfp * self.query.min_precision:
             print("herejoint",tp,tpfp, tpfp*self.query.min_precision, self.total_sampled)
             filter_num = math.ceil(tpfp*self.query.min_precision-tp)

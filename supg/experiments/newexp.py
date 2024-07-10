@@ -15,7 +15,7 @@ from supg.sampler import ImportanceSampler
 print('here2')
 from supg.selector import ApproxQuery
 print('here3')
-from supg.selector import JointSelector
+from supg.selector import JointSelector, NewJointSelector
 print('here4')
 from supg.experiments.trial_runner import TrialRunner
 print('here5')
@@ -28,6 +28,7 @@ import time
 
 def parse_args():
     parser = argparse.ArgumentParser(description='SUPG')
+    parser.add_argument('--mode', type=str, default='old', help='selector mode (old/new)')
     parser.add_argument('--source', type=str, default='newout.mp4', help='source video file')
     parser.add_argument('--text', type=str, default='a person', help='query text')
     parser.add_argument('--save', action='store_true', help='save')
@@ -38,7 +39,7 @@ def parse_args():
     return parser.parse_args(), parser.print_help()
 
 opt, print_usage = parse_args()
-print("hereargs",opt.source, opt.text, opt.multiple_videos, opt.budget, opt.save, opt.plot, opt.oth)
+print("hereargs",opt.mode, opt.source, opt.text, opt.multiple_videos, opt.budget, opt.save, opt.plot, opt.oth)
 time1 = time.time()
 source = VideoSource(opt.source, opt.text, opt.multiple_videos, save=opt.save, oth=opt.oth)
 # source = VideoSource('../../out.mp4','dog')
@@ -50,6 +51,8 @@ sampler = ImportanceSampler()
 verbose = True
 targets = [0.5, 0.6, 0.7, 0.8, 0.9]
 queries_num = []
+path = 'new_joint_figures_0.4/'
+# path = 'new_joint_figures/'
 time2 = time.time()
 print("Time to generate proxy scores:", time2-time1, "s")
 for target in targets:
@@ -62,7 +65,10 @@ for target in targets:
                 min_recall=target, min_precision=target, delta=0.05,
                 budget=opt.budget
         )
-        selector = JointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
+        if opt.mode == 'old':
+                selector = JointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
+        else:
+                selector = NewJointSelector(query, source, sampler, sample_mode='sqrt', verbose=verbose)
         return_idxs = selector.select()
         queries_num.append(selector.total_sampled)
         print('Target:', target, 'num:', selector.total_sampled)
@@ -75,8 +81,10 @@ for target in targets:
                 plt.vlines(indices, 0, source.proxy_scores, color='b', linewidth=0.01, label='Not used oracle')
                 print("here",selector.sampled)
                 plt.vlines(indices[selector.sampled], 0, source.proxy_scores[selector.sampled], color='r', linewidth=0.01, label='Used oracle')
-                plt.axhline(y=source.proxy_scores[selector.critical_value], color='g', linestyle='--', linewidth=0.5, label='Critical Value')
-                title = opt.source+", "+opt.text+", "+str(target)
+                plt.axhline(y=source.proxy_scores[selector.critical_value], color='g', linestyle='--', linewidth=0.5, label='Recall Critical Value')
+                if opt.mode != 'old':
+                        plt.axhline(y=source.proxy_scores[selector.precision_critical_value], color='y', linestyle='--', linewidth=0.5, label='Precision Critical Value')
+                title = path + opt.source+", "+opt.text+", "+str(target)
                 plt.title(title)
                 plt.xlabel('Frame')
                 plt.ylabel('Proxy Score')
@@ -90,6 +98,8 @@ for target in targets:
                 plt.vlines(rank[selector.sampled], 0, source.proxy_scores[selector.sampled], color='r', linewidth=0.01,
                            label='Used oracle')
                 plt.axhline(y=source.proxy_scores[selector.critical_value], color='g', linestyle='--', linewidth=0.5, label='Critical Value')
+                if opt.mode != 'old':
+                        plt.axhline(y=source.proxy_scores[selector.precision_critical_value], color='y', linestyle='--', linewidth=0.5, label='Precision Critical Value')
                 title = title + " sorted"
                 plt.title(title)
                 plt.xlabel('Frame')
@@ -117,5 +127,6 @@ for target in targets:
 plt.plot(targets, queries_num)
 for i, txt in enumerate(queries_num):
         plt.annotate(txt, (targets[i], queries_num[i]))
+plt.savefig(path + opt.source+", "+opt.text+", oracle threshold" + str(opt.oth) + ".png")
 plt.show()
 

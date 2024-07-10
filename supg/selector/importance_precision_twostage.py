@@ -55,6 +55,7 @@ class ImportancePrecisionTwoStageSelector(BaseSelector):
         tpr_lb, tpr_ub = bounder.calc_bounds(
             fx = samp_labels*samp_masses,
         )
+        # cutoff_ub: n_match/y; tpr_ub * n: n_match
         cutoff_ub = int(math.ceil(tpr_ub * n / self.query.min_precision))
         # print('cutoff ub: {}'.format(cutoff_ub))
 
@@ -68,7 +69,11 @@ class ImportancePrecisionTwoStageSelector(BaseSelector):
         # print("ns2: {}, len(samp2): {}".format(n_sample_2, len(samp2_ids)))
 
         allowed = [0]
-        for s_idx in range(self.start_samp, n_sample_2, self.step_size):
+        # for s_idx in range(self.start_samp, n_sample_2, self.step_size):
+        start = ((n_sample_2 - self.start_samp) // self.step_size) * self.step_size + self.start_samp
+        print("start: {}, n_sample_2: {}, samp_2_size: {}".format(start, n_sample_2, len(samp2_ranks)))
+        for s_idx in range(start, self.start_samp - 1, -self.step_size):
+            print("herep1", s_idx)
             if s_idx + 1 >= len(samp2_ranks):
                 continue
             cur_u_idx = samp2_ranks[s_idx]
@@ -83,9 +88,19 @@ class ImportancePrecisionTwoStageSelector(BaseSelector):
                 fx=samp2_labels[:s_idx+1]*cur_x_masses[cur_subsample_x_idxs],
             )
             prec_lb = pos_rank_lb
+            print("prec_lb: {}, prec_ub: {}".format(prec_lb, pos_rank_ub))
             if prec_lb > self.query.min_precision:
+                print("herep2",s_idx)
                 allowed.append(cur_u_idx)
+                break
 
         set_inds = data_idxs[:allowed[-1]]
-        samp_inds = self.data.filter(np.concatenate([samp_ids, samp2_ids]))
-        return np.unique(np.concatenate([set_inds, samp_inds]))
+        self.precision_set_ids = set_inds
+        self.precision_critical_value = data_idxs[allowed[-1]]
+        # samp_inds = self.data.filter(np.concatenate([samp_ids, samp2_ids]))
+        pos_samp_ids1 = np.array([samp_ids[i] for i in range(len(samp_ids)) if samp_labels[i] == 1])
+        pos_samp_ids2 = np.array([samp2_ids[i] for i in range(len(samp2_ids)) if samp2_labels[i] == 1])
+        pos_samp_ids = np.concatenate([pos_samp_ids1, pos_samp_ids2])
+        self.precision_sampled = np.unique(np.concatenate((samp_ids, samp2_ids)))
+        self.precision_pos_sampled = np.unique(pos_samp_ids)
+        return np.unique(np.concatenate([set_inds, pos_samp_ids]))

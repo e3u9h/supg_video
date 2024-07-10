@@ -39,11 +39,13 @@ class ImportanceSampler(Sampler):
         """
         if s > max_idx:
             s = max_idx
-        if max_idx != len(self.weights):
+        print("heresample", max_idx, len(self.weights))
+        if max_idx < len(self.weights):
             weights = self.weights[:max_idx]
             weights /= weights.sum()
         else:
             weights = self.weights
+            max_idx = len(self.weights)
         self.sampled_idxs = self.random.choice(max_idx, size=s, replace=True, p=weights)
         self.sampled_weights = self.weights[self.sampled_idxs]
         return self.sampled_idxs

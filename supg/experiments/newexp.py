@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+import os
+# new_cache_dir = '/research/d2/spc/fzdu2/cache'
+# huggingface_cache_dir = os.path.join(new_cache_dir, 'huggingface')
+# os.environ['TORCH_HOME'] = new_cache_dir
+# os.environ['TRANSFORMERS_CACHE'] = huggingface_cache_dir
+# os.environ['HF_HOME'] = huggingface_cache_dir
+# print(f"TORCH_HOME is set to: {os.environ.get('TORCH_HOME')}")
 # import sys
 # sys.path.append('./')
 import numpy as np
@@ -21,17 +29,18 @@ import time
 def parse_args():
     parser = argparse.ArgumentParser(description='SUPG')
     parser.add_argument('--source', type=str, default='newout.mp4', help='source video file')
-    parser.add_argument('--text', type=str, default='a person.', help='query text')
+    parser.add_argument('--text', type=str, default='a person', help='query text')
     parser.add_argument('--save', action='store_true', help='save')
     parser.add_argument('--multiple_videos', action='store_true', help='multiple videos')
     parser.add_argument('--budget', type=int, default=1000, help='budget')
     parser.add_argument('--plot', action='store_true', help='plot')
+    parser.add_argument('--oth', type=float, default=0.8, help='oracle threshold')
     return parser.parse_args(), parser.print_help()
 
 opt, print_usage = parse_args()
-print("hereargs",opt.source, opt.text, opt.multiple_videos, opt.budget, opt.save, opt.plot)
+print("hereargs",opt.source, opt.text, opt.multiple_videos, opt.budget, opt.save, opt.plot, opt.oth)
 time1 = time.time()
-source = VideoSource(opt.source, opt.text, opt.multiple_videos, save=opt.save)
+source = VideoSource(opt.source, opt.text, opt.multiple_videos, save=opt.save, oth=opt.oth)
 # source = VideoSource('../../out.mp4','dog')
 # source = VideoSource('newout.mp4','a dog')
 # source = VideoSource('newout.mp4','an elephant')
@@ -106,5 +115,7 @@ for target in targets:
         #                                 break
         #         cap.release()
 plt.plot(targets, queries_num)
+for i, txt in enumerate(queries_num):
+        plt.annotate(txt, (targets[i], queries_num[i]))
 plt.show()
 

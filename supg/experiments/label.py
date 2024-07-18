@@ -14,11 +14,16 @@ import time
 #texts = ['a dog', 'a person', 'an elephant', 'a zebra']
 #texts = ['a cat', 'an umbrella', 'a person', 'a chicken']
 #texts = ['a panda', 'a human', 'a bicycle', 'a fox', 'a lion', 'a horse', 'a bird', 'an airplane']
-texts = ['a human', 'a car', 'a dog', 'the sun']
+#texts = ['a human', 'a car', 'a dog', 'the sun', 'a man', 'a woman']
+#texts = ['a bird', 'an airplane', 'a man', 'a woman']
+#texts = ['bamboos', 'a tree', 'grass', 'a butterfly']
+# for fun_farm
+texts = ['a horse', 'a person', 'a human', 'a amn', 'a woman', 'a kid', 'a boy', 'a pig', 'a dog', 'a goat', 'an alpaca', 'grass', 'a bicycle', 'a chicken']
 for text in texts:
     #source = VideoSource('newout.mp4', text, save=False, oth=0.8)
-    #source = VideoSource('newout.mp4', text, save=True, oth=0.6)
-    source = VideoSource('b_video.mp4', text, save=True, oth=0.6)
+    #source = VideoSource('newout.mp4', text, save=True, oth=0.8)
+    #source = VideoSource('b_video.mp4', text, save=True, oth=0.6)
+    source = VideoSource('fun_farm.mp4', text, save=True, oth=0.6)
     time1 = time.time()
     length = len(source.proxy_scores)
     results = source.lookup(range(length))

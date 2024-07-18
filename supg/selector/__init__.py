@@ -13,3 +13,4 @@ from .naive_precision import NaivePrecisionSelector
 # Joint
 from .joint_selector import JointSelector
 from .new_joint_selector import NewJointSelector
+from .original_joint_selector import OriginalJointSelector

@@ -124,6 +124,7 @@ class RecallSelector(BaseSelector):
         self.log("Rc: {}".format(rc))
 
         if rc >= 1.:
+            self.set_ids = np.array(list(range(n_xs)))
             return np.array(list(range(n_xs)))
 
         # t_adj_s_idx是t'对应的数据的index的index的index,s_pos_idxs是所有符合t'要求的数据的index的index的index(但是好像没用到这个)
